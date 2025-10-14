@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oficina Mecânica - Recibos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; color: #333; }
+h1 { text-align: center; color: #0d6efd; margin-bottom: 30px; font-size: 2em; }
+h2 { color: #495057; border-bottom: 2px solid #0d6efd; padding-bottom: 10px; margin-top: 30px; }
+form { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 25px; }
+label { display: block; margin-top: 15px; font-weight: 600; color: #495057; }
+input { width: 100%; padding: 12px; margin-top: 5px; border: 2px solid #e9ecef; border-radius: 8px; box-sizing: border-box; font-size: 16px; transition: border-color 0.3s; }
+input:focus { border-color: #0d6efd; outline: none; box-shadow: 0 0 0 3px rgba(13,110,253,0.1); }
+button { background: linear-gradient(135deg, #0d6efd, #0a58ca); color: white; padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; margin-top: 15px; font-size: 16px; font-weight: 500; transition: transform 0.2s, box-shadow 0.2s; }
+button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(13,110,253,0.3); }
+button.danger { background: linear-gradient(135deg, #dc3545, #bb2d3b); }
+button.success { background: linear-gradient(135deg, #198754, #146c43); }
+#itensLista { margin-top: 15px; }
+.item-linha { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+.item-linha input { flex: 1; }
+.item-linha button { flex: none; padding: 8px 12px; }
+.nota-item { border: 1px solid #dee2e6; padding: 15px; margin-bottom: 10px; border-radius: 8px; background: #f8f9fa; }
+.nota-item h4 { color: #0d6efd; margin-bottom: 10px; }
+.nota-item.alerta { border: 2px solid #dc3545; background: #fff0f0; }
+.nota-item .alerta-text { color: #dc3545; font-weight: 700; margin-top: 6px; }
+#valorTotal { font-weight: bold; font-size: 1.4em; color: #198754; background: #d1e7dd; padding: 10px; border-radius: 8px; display: inline-block; }
+#busca { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 16px; }
+.modal { display: none; position: fixed; z-index: 999; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
+.modal-content { background: white; margin: 50px auto; padding: 20px; border-radius: 12px; max-width: 600px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); position: relative; white-space: pre-wrap; font-family: monospace; }
+.close { color: #aaa; position: absolute; top: 10px; right: 15px; font-size: 24px; font-weight: bold; cursor: pointer; }
+.close:hover { color: #000; }
+#btnFiltroAntigas { margin-left: 8px; }
+</style>
+</head>
+<body>
+
+<h1>Oficina Mecânica - Recibos</h1>
+
+<form id="notaForm">
+    <h2>Dados da Oficina</h2>
+    <label>Nome da Oficina:</label>
+    <input type="text" id="prestadorNome" value="Oficina mecânica Santa Luzia - Du mecânico" readonly>
+
+    <label>Endereço:</label>
+    <input type="text" id="prestadorEndereco" value="Rua Afonso Cáfaro - 127 - Quinta das Paineiras - Guapiaçu" readonly>
+    <label>Telefone/Email:</label>
+    <input type="text" id="prestadorContato" value="32672000 - 17981392526" readonly>
+
+    <h2>Dados do Cliente</h2>
+    <label>Nome:</label>
+    <input type="text" id="proprietarioNome" required>
+
+    <h2>Veículo</h2>
+    <label>Placa:</label>
+    <input type="text" id="veiculoPlaca" style="text-transform: uppercase;" maxlength="8">
+    <label>Cor:</label>
+    <input type="text" id="veiculoCor">
+    <label>Modelo (Marca/Modelo/Ano):</label>
+    <input type="text" id="veiculoModelo" required>
+    <label>Data:</label>
+    <input type="date" id="dataNota">
+
+    <h2>Serviços Prestados</h2>
+    <div>
+        <label>Quantidade (opcional):</label>
+        <input type="number" id="novaQtd" min="0" step="1">
+        <label>Descrição:</label>
+        <input type="text" id="novoDesc">
+        <label>Valor Total (R$):</label>
+        <input type="number" id="novoValor" min="0" step="0.01">
+        <button type="button" onclick="adicionarItem()">Adicionar Serviço</button>
+    </div>
+
+    <div id="itensLista"></div>
+    <label>Valor Total: <span id="valorTotal">R$ 0,00</span></label>
+    <button type="button" class="success" onclick="gerarNota()">Gerar Nota</button>
+</form>
+
+<h2>Histórico de Recibos</h2>
+<input type="text" id="busca" placeholder="Buscar por nome ou modelo..." onkeyup="filtrarNotas()">
+<button id="btnFiltroAntigas" onclick="toggleFiltroAntigas()">Filtrar notas antigas (+30 dias)</button>
+<div id="listaNotas"></div>
+
+<div id="modalNota" class="modal">
+  <div class="modal-content">
+    <span class="close" onclick="fecharModal()">&times;</span>
+    <pre id="modalTexto"></pre>
+  </div>
+</div>
+
+<div id="modalPagamento" class="modal">
+  <div class="modal-content" style="text-align:center;">
+    <h3>Selecione o método de pagamento</h3>
+    <button onclick="confirmarPagamento('dinheiro')">Dinheiro</button>
+    <button onclick="confirmarPagamento('pix')">Pix</button>
+    <button onclick="confirmarPagamento('cartao')">Cartão (+12%)</button>
+  </div>
+</div>
+
+<script>
+let notas = JSON.parse(localStorage.getItem('historicoNotas') || '[]');
+let itensAtuais = [];
+let indicePagamento = null;
+let filtroAntigasAtivo = false;
+
+function adicionarItem() {
+    const desc = document.getElementById('novoDesc').value.trim();
+    const qtd = document.getElementById('novaQtd').value;
+    const valor = parseFloat(document.getElementById('novoValor').value) || 0;
+    if (!desc || valor <= 0) { alert('Preencha a descrição e o valor corretamente!'); return; }
+    itensAtuais.push({ desc, qtd: qtd ? qtd : null, valor: valor.toFixed(2), original: valor.toFixed(2) });
+    exibirItens(); atualizarValorTotal(); limparCampos();
+}
+
+function limparCampos() { document.getElementById('novoDesc').value=''; document.getElementById('novaQtd').value=''; document.getElementById('novoValor').value=''; }
+function exibirItens() {
+    const lista = document.getElementById('itensLista');
+    if(itensAtuais.length===0){ lista.innerHTML='<p style="color:#6c757d;">Nenhum serviço adicionado.</p>'; return; }
+    lista.innerHTML = itensAtuais.map((item,i)=>`
+        <div class="item-linha">
+            <input type="number" value="${item.qtd || ''}" min="0" step="1" onchange="editarItem(${i}, 'qtd', this.value)">
+            <input type="text" value="${item.desc}" onchange="editarItem(${i}, 'desc', this.value)">
+            <input type="number" value="${item.valor}" step="0.01" onchange="editarItem(${i}, 'valor', parseFloat(this.value)||0)">
+            <button class="danger" onclick="removerItem(${i})">Remover</button>
+        </div>
+    `).join('');
+}
+
+function editarItem(i,campo,valor){ if(itensAtuais[i]){ itensAtuais[i][campo]=valor||null; atualizarValorTotal(); } }
+function removerItem(i){ itensAtuais.splice(i,1); exibirItens(); atualizarValorTotal(); }
+function atualizarValorTotal(){ const total = itensAtuais.reduce((t,i)=>t+parseFloat(i.valor),0); document.getElementById('valorTotal').textContent=`R$ ${total.toFixed(2)}`; }
+
+function gerarNota(){
+    const nota = {
+        numero:notas.length+1,
+        prestador:{nome:"Oficina mecânica Santa Luzia - Du mecânico", endereco:"Rua Afonso Cáfaro 127 Quinta das Paineiras Guapiaçu", contato:"17981392526 - 32672000"},
+        cliente:document.getElementById('proprietarioNome').value,
+        veiculo:{placa:document.getElementById('veiculoPlaca').value, cor:document.getElementById('veiculoCor').value, modelo:document.getElementById('veiculoModelo').value},
+        data:document.getElementById('dataNota').value,
+        itens:JSON.parse(JSON.stringify(itensAtuais)),
+        total:itensAtuais.reduce((t,i)=>t+parseFloat(i.valor),0).toFixed(2),
+        pagamento:'pendente'
+    };
+    notas.push(nota);
+    localStorage.setItem('historicoNotas',JSON.stringify(notas));
+    itensAtuais=[]; exibirItens(); atualizarValorTotal(); exibirHistorico();
+}
+
+function abrirPagamento(i){ indicePagamento=i; document.getElementById('modalPagamento').style.display='block'; }
+
+function confirmarPagamento(metodo){
+    document.getElementById('modalPagamento').style.display='none';
+    const nota = notas[indicePagamento];
+
+    // restaurar valores originais em número
+    nota.itens.forEach(i => i.valor = parseFloat(i.original || i.valor));
+
+    if(metodo === 'cartao'){
+        // --- 1) separar itens com quantidade (taxáveis) e sem quantidade (isentos) ---
+        const itensMap = nota.itens.map((it, idx) => ({ idx, qtd: it.qtd, valor: parseFloat(it.valor) }));
+        const itensComQtd = itensMap.filter(it => it.qtd != null && it.qtd !== '' && Number(it.qtd) > 0);
+        const itensSemQtd = itensMap.filter(it => !(it.qtd != null && it.qtd !== '' && Number(it.qtd) > 0));
+
+        // se não houver itens com qtd, não há distribuição da taxa (aplica-se arredondamento apenas)
+        if (itensComQtd.length > 0) {
+            // --- 2) calcular em centavos para evitar problemas de float ---
+            const untaxedCents = Math.round(itensSemQtd.reduce((s,it)=>s + it.valor, 0) * 100);
+            const baseCents = itensComQtd.map(it => Math.round(it.valor * 100));
+            const baseTotalCents = baseCents.reduce((s,c)=>s+c,0);
+
+            // --- 3) valor total antes do arredondamento (em centavos, com a taxa de 12% exata) ---
+            const taxExactCents = baseTotalCents * 0.12; // float em centavos
+            const totalBeforeCentsExact = untaxedCents + baseTotalCents + taxExactCents;
+
+            // --- 4) escolher target: teto para próxima unidade inteira (R$ inteiro) ---
+            const targetTotalReais = Math.ceil(totalBeforeCentsExact / 100); // inteiro em reais
+            const targetTotalCents = targetTotalReais * 100;
+
+            // --- 5) quanto deve valer SOMENTE a parte dos itens com qtd (em centavos) para atingir o target ---
+            let taxedTargetSumCents = targetTotalCents - untaxedCents;
+            if (taxedTargetSumCents < baseTotalCents) {
+                // segurança: não pode ser menor que o total base desses itens
+                taxedTargetSumCents = baseTotalCents;
+            }
+
+            // --- 6) distribuir taxedTargetSumCents proporcionalmente aos baseCents ---
+            const shares = baseCents.map(b => Math.floor(b * taxedTargetSumCents / baseTotalCents));
+            let sumShares = shares.reduce((s,v)=>s+v,0);
+            let diff = taxedTargetSumCents - sumShares; // centavos restantes para distribuir
+
+            if (diff > 0) {
+                // calcular os restos para distribuição justa
+                const remainders = baseCents.map((b, i) => {
+                    const exact = (b * taxedTargetSumCents) / baseTotalCents;
+                    return { i, rem: exact - Math.floor(exact) };
+                });
+                // ordenar por resto decrescente
+                remainders.sort((a,b) => b.rem - a.rem);
+                // distribuir 1 cent aos maiores restos até zerar diff
+                for (let k=0; k<diff; k++){
+                    shares[remainders[k % remainders.length].i] += 1;
+                }
+                sumShares = shares.reduce((s,v)=>s+v,0);
+                diff = taxedTargetSumCents - sumShares; // deve ficar 0
+            }
+
+            // --- 7) aplicar os novos valores (em reais com 2 casas) apenas nos itens com qtd ---
+            itensComQtd.forEach((it, idx) => {
+                const cents = shares[idx];
+                nota.itens[it.idx].valor = (cents / 100).toFixed(2);
+            });
+
+        } else {
+            // sem itens com qtd: mantém os valores originais (somente iremos arredondar o total abaixo)
+        }
+    }
+
+    // --- 8) calcular total final e arredondar para inteiro (se já foi distribuído, soma deve bater) ---
+    const totalBruto = nota.itens.reduce((t,i)=>t+parseFloat(i.valor),0);
+    // garantir que total finalize em .00 (arredondamento pra cima)
+    const totalCeil = Math.ceil(totalBruto);
+    nota.total = totalCeil.toFixed(2);
+
+    nota.pagamento = metodo;
+
+    notas[indicePagamento] = nota;
+    localStorage.setItem('historicoNotas', JSON.stringify(notas));
+    gerarPDF(nota);
+    exibirHistorico();
+}
+
+function gerarPDF(nota) {
+    const { jsPDF } = window.jspdf;
+
+    // 🔧 Altura dinâmica: mínimo 150mm, cresce conforme a quantidade de itens
+    const altura = Math.max(150, 110 + (nota.itens.length * 6));
+    const doc = new jsPDF({ unit: "mm", format: [80, altura] });
+
+    let y = 8;
+    const centro = t => (80 - doc.getTextWidth(t)) / 2;
+    const margem = 5;
+    doc.setFontSize(8);
+    doc.setFont("courier", "normal");
+
+    // === Logo ===
+    const logoUrl = "du-removebg-preview.png";
+    const logoLargura = 25;
+    const logoAltura = 12;
+    const xLogo = (80 - logoLargura) / 2;
+    try { doc.addImage(logoUrl, "PNG", xLogo, y, logoLargura, logoAltura); } catch (e) { }
+    y += logoAltura + 2;
+
+    doc.line(margem, y, 80 - margem, y);
+    y += 4;
+
+    const enderecoQuebrado = doc.splitTextToSize(nota.prestador.endereco, 70);
+    doc.text(nota.prestador.nome, centro(nota.prestador.nome), y); y += 5;
+    enderecoQuebrado.forEach(l => { doc.text(l, centro(l), y); y += 4; });
+    doc.text("Telefone Du: 17981392526", centro("Telefone Du: 17981392526"), y); y += 4;
+    doc.text("Telefone Oficina: 32672000", centro("Telefone Oficina: 32672000"), y); y += 6;
+
+    doc.line(margem, y, 80 - margem, y); y += 6;
+    doc.text(`Cliente: ${nota.cliente}`, margem + 2, y); y += 4;
+    doc.text(`Veículo: ${nota.veiculo.modelo}`, margem + 2, y); y += 4;
+    doc.text(`Placa: ${nota.veiculo.placa}`, margem + 2, y); y += 4;
+    doc.text(`Cor: ${nota.veiculo.cor || '-'}`, margem + 2, y); y += 4;
+    doc.text(`Data: ${nota.data}`, margem + 2, y); y += 6;
+    doc.text(`Pagamento: ${nota.pagamento.toUpperCase()}`, margem + 2, y); y += 6;
+    doc.line(margem, y, 80 - margem, y); y += 5;
+    doc.text("Serviços:", margem + 2, y); y += 4;
+
+    // === Itens ===
+    nota.itens.forEach(item => {
+        let l = `${item.qtd ? item.qtd + 'x ' : ''}${item.desc} - R$ ${parseFloat(item.valor).toFixed(2)}`;
+        let linhas = doc.splitTextToSize(l, 70);
+        linhas.forEach(ll => { doc.text(ll, margem + 2, y); y += 4; });
+    });
+
+    y += 3;
+    doc.line(margem, y, 80 - margem, y);
+    y += 5;
+    doc.setFont("courier", "bold");
+    doc.text(`TOTAL: R$ ${parseFloat(nota.total).toFixed(2)}`, margem + 2, y);
+    y += 15;
+
+    // === Assinatura (centralizada de forma precisa) ===
+    doc.setFont("courier", "normal");
+    const assinaturaTexto = "**Assinatura Cliente:_______________________**";
+
+    const larguraTexto = doc.getTextWidth(assinaturaTexto);
+    const xAssinatura = (80 - larguraTexto) / 2;
+
+    // 🔒 Garante que fique sempre dentro do limite da folha
+    if (y > altura - 15) y = altura - 15;
+
+    doc.text(assinaturaTexto, xAssinatura, y);
+
+    const safe = nota.cliente.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+    doc.save(`Recibo_${safe}.pdf`);
+}
+
+
+document.getElementById('dataNota').value=new Date().toISOString().split('T')[0];
+
+function exibirHistorico() {
+    const lista=document.getElementById('listaNotas');
+    if(notas.length===0){ lista.innerHTML='<p style="color:#6c757d;">Nenhuma nota registrada.</p>'; return; }
+
+    // mapeia notas com índice e flag de "antiga"
+    const hoje = new Date();
+    const notasMapeadas = notas.map((n,i)=>{
+        // nota.data vem do input date no formato YYYY-MM-DD (padrão)
+        const dt = new Date(n.data);
+        const diffDias = Math.floor((hoje - dt) / (1000*60*60*24));
+        const isAntiga = diffDias > 30;
+        return { ...n, _idx:i, _isAntiga:isAntiga, _dias:diffDias };
+    });
+
+    // se o filtro estiver ativo, filtra apenas antigas
+    const aExibir = filtroAntigasAtivo ? notasMapeadas.filter(n=>n._isAntiga) : notasMapeadas;
+
+    if(aExibir.length===0){ lista.innerHTML='<p style="color:#6c757d;">Nenhuma nota registrada.</p>'; return; }
+
+    lista.innerHTML = aExibir.map(n=>`
+        <div class="nota-item ${n._isAntiga ? 'alerta' : ''}">
+            <h4>${n.cliente} - ${n.veiculo.modelo}</h4>
+            <p>Data: ${n.data} | Total: R$ ${n.total}</p>
+            <p>Pagamento: ${n.pagamento || 'pendente'}</p>
+            ${n._isAntiga ? `<div class="alerta-text">⚠️ Nota com ${n._dias} dias</div>` : ''}
+            <button onclick="visualizarNota(${n._idx})">Visualizar</button>
+            <button onclick="abrirPagamento(${n._idx})">Pagar</button>
+            <button onclick="gerarPDF(notas[${n._idx}])">Baixar PDF</button>
+            <button class="danger" onclick="excluirNota(${n._idx})">Excluir</button>
+        </div>
+    `).join('');
+}
+function visualizarNota(i){
+    const nota=notas[i];
+    let texto=`${nota.prestador.nome}\n${nota.prestador.endereco}\nContato: ${nota.prestador.contato}\n\nCliente: ${nota.cliente}\nVeículo: ${nota.veiculo.modelo} - ${nota.veiculo.placa}\nCor: ${nota.veiculo.cor||'-'}\nData: ${nota.data}\nPagamento: ${nota.pagamento||'pendente'}\n\nServiços:\n`;
+    nota.itens.forEach(item=>{
+        let linha='';
+        if(item.qtd)linha+=`Qtd: ${item.qtd} - `;
+        linha+=`${item.desc} - R$ ${parseFloat(item.valor).toFixed(2)}`;
+        texto+=linha+'\n';
+    });
+    texto+=`\nTotal: R$ ${nota.total}`;
+    document.getElementById('modalTexto').textContent=texto;
+    document.getElementById('modalNota').style.display='block';
+}
+function fecharModal(){document.getElementById('modalNota').style.display='none';}
+function excluirNota(i){ if(!confirm('Tem certeza que deseja excluir esta nota?')) return; notas.splice(i,1);localStorage.setItem('historicoNotas',JSON.stringify(notas));exibirHistorico();}
+function filtrarNotas() {
+    const termo = document.getElementById('busca').value.toLowerCase();
+    const lista = document.getElementById('listaNotas');
+
+    // manter índices originais: cria um array com index incluído
+    const notasComIdx = notas.map((n,i)=> ({ ...n, _idx:i }) );
+    const notasFiltradas = notasComIdx.filter(n =>
+        (n.cliente || '').toLowerCase().includes(termo) ||
+        (n.veiculo && (n.veiculo.modelo || '').toLowerCase()).includes(termo)
+    );
+
+    if(notasFiltradas.length === 0){
+        lista.innerHTML = '<p style="color:#6c757d;">Nenhuma nota encontrada.</p>';
+        return;
+    }
+
+    const hoje = new Date();
+    lista.innerHTML = notasFiltradas.map(n=>{
+        const dt = new Date(n.data);
+        const diffDias = Math.floor((hoje - dt) / (1000*60*60*24));
+        const isAntiga = diffDias > 30;
+        return `
+            <div class="nota-item ${isAntiga ? 'alerta' : ''}">
+                <h4>${n.cliente} - ${n.veiculo.modelo}</h4>
+                <p>Data: ${n.data} | Total: R$ ${n.total}</p>
+                <p>Pagamento: ${n.pagamento || 'pendente'}</p>
+                ${isAntiga ? `<div class="alerta-text">⚠️ Nota com ${diffDias} dias</div>` : ''}
+                <button onclick="visualizarNota(${n._idx})">Visualizar</button>
+                <button onclick="abrirPagamento(${n._idx})">Pagar</button>
+                <button onclick="gerarPDF(notas[${n._idx}])">Baixar PDF</button>
+                <button class="danger" onclick="excluirNota(${n._idx})">Excluir</button>
+            </div>
+        `;
+    }).join('');
+}
+
+// toggle do botão filtro antigas
+function toggleFiltroAntigas(){
+    filtroAntigasAtivo = !filtroAntigasAtivo;
+    document.getElementById('btnFiltroAntigas').textContent = filtroAntigasAtivo ? 'Mostrar todas as notas' : 'Filtrar notas antigas (+30 dias)';
+    exibirHistorico();
+}
+
+exibirHistorico();
+</script>
+</body>
+</html>
