@@ -242,7 +242,7 @@ function gerarPDF(nota) {
     const centro = t => (80 - doc.getTextWidth(t)) / 2;
     const margem = 5;
     doc.setFontSize(8);
-    doc.setFont("courier", "normal");
+    doc.setFont("courier", "bold");
 
     // === Logo ===
     const logoUrl = "du-removebg-preview.png";
@@ -281,13 +281,15 @@ function gerarPDF(nota) {
     y += 3;
     doc.line(margem, y, 80 - margem, y);
     y += 5;
+    doc.setFontSize(8);
     doc.setFont("courier", "bold");
+
     doc.text(`TOTAL: R$ ${parseFloat(nota.total).toFixed(2)}`, margem + 2, y);
     y += 15;
 
     // === Assinatura (centralizada de forma precisa) ===
-    doc.setFont("courier", "normal");
-    const assinaturaTexto = "**Assinatura Cliente:_______________________**";
+    doc.setFont("courier", "bold");
+    const assinaturaTexto = "Assinatura Cliente:_______________________";
 
     const larguraTexto = doc.getTextWidth(assinaturaTexto);
     const xAssinatura = (80 - larguraTexto) / 2;
